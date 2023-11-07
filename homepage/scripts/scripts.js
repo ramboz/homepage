@@ -10,7 +10,12 @@
  * governing permissions and limitations under the License.
  */
 
-import { setLibs } from './utils.js';
+import {
+  setLibs,
+  runExperiments,
+  setExperimentsContext,
+  showExperimentsOverlay,
+} from './utils.js';
 
 const ACOM_SIGNED_IN_STATUS = 'acomsis';
 const STYLES = '';
@@ -131,19 +136,24 @@ const CONFIG = {
   }
 };
 
+const AUDIENCES = {
+  mobile: () => window.innerWidth < 600,
+  desktop: () => window.innerWidth >= 600,
+  // define your custom audiences here as needed
+};
+
 // Load LCP image immediately
-(function loadLCPImage() {
+function loadLCPImage() {
   const lcpImg = document.querySelector('img');
   lcpImg?.removeAttribute('loading');
   lcpImg?.setAttribute('fetchpriority', 'high');  
-}());
+}
 
 /*
  * ------------------------------------------------------------
  * Edit below at your own risk
  * ------------------------------------------------------------
  */
-
 const miloLibs = setLibs(LIBS);
 
 const getCookie = (name) => document.cookie
@@ -152,8 +162,7 @@ const getCookie = (name) => document.cookie
   ?.split('=')[1];
 
 async function imsCheck() {
-  const { loadIms, setConfig } = await import(`${miloLibs}/utils/utils.js`);
-  setConfig({ ...CONFIG, miloLibs });
+  const { getConfig, loadIms, updateConfig } = await import(`${miloLibs}/utils/utils.js`);
   try {
     await loadIms();
   } catch(e) {
@@ -176,8 +185,14 @@ function loadStyles() {
 
 (async function loadPage() {
   loadStyles();
-  const { loadArea, setConfig } = await import(`${miloLibs}/utils/utils.js`);
+  const [{ loadArea, setConfig }] = await Promise.all([
+    import(`${miloLibs}/utils/utils.js`),
+    import(`${miloLibs}/utils/samplerum.js`),
+  ])
   setConfig({ ...CONFIG, miloLibs });
+  await setExperimentsContext('/homepage');
+  await runExperiments({ audiences: AUDIENCES });
+  loadLCPImage();
   const loadAreaPromise = loadArea();
   imsCheck().then(isSignedInUser => {
     const signedInCookie = getCookie(ACOM_SIGNED_IN_STATUS);
@@ -193,4 +208,5 @@ function loadStyles() {
     }
   })
   await loadAreaPromise;
+  showExperimentsOverlay({ audiences: AUDIENCES });
 }());
